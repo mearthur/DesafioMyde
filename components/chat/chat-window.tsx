@@ -6,70 +6,80 @@ import { MessageBubble } from "./message-bubble";
 import { ChatHeader } from "./chat-header";
 import { MessageInput } from "./message-input";
 import { LoadingMessages, ErrorState, EmptyChat } from "@/components/ui/states";
-import { formatMessageDate, groupMessagesByDate } from "@/lib/utils";
+import {
+  formatMessageDate,
+  groupMessagesByDate,
+  isTestMessage,
+  removeDuplicateMessages,
+} from "@/lib/utils";
 
 export function ChatWindow({ conversationId }: { conversationId: string }) {
   const {
     data: messages,
     isLoading,
+    isFetching,
     isError,
     refetch,
   } = useMessages(conversationId);
   const { data: conversations } = useConversations();
   const bottomRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const isFirstLoad = useRef(true);
+
   const knownIdsRef = useRef<Set<string>>(new Set());
-  const [newMessageIds, setNewMessageIds] = useState<Set<string>>(new Set());
+  const hasLoadedRef = useRef(false);
+  const [animatingIds, setAnimatingIds] = useState<Set<string>>(new Set());
 
   const conversation = conversations?.find((c) => c.id === conversationId);
 
+  // Reset ao trocar de conversa
   useEffect(() => {
-    if (!messages?.length) return;
+    knownIdsRef.current = new Set();
+    hasLoadedRef.current = false;
+    setAnimatingIds(new Set());
+  }, [conversationId]);
 
-    if (isFirstLoad.current) {
-      // Primeira carga: marca todos como conhecidos, sem animar nenhum
+  useEffect(() => {
+    if (!messages) return;
+
+    // ─── Primeira carga: histórico aparece de uma vez, sem animação ───
+    if (!hasLoadedRef.current) {
+      hasLoadedRef.current = true;
       messages.forEach((m) => knownIdsRef.current.add(m.id));
       bottomRef.current?.scrollIntoView({ behavior: "instant" });
-      isFirstLoad.current = false;
       return;
     }
 
-    // Polling subsequente: só anima mensagens realmente novas
+    // ─── Depois disso: só anima mensagens realmente novas (enviadas ou recebidas via polling) ───
     const incoming = messages.filter((m) => !knownIdsRef.current.has(m.id));
     if (incoming.length === 0) return;
 
     incoming.forEach((m) => knownIdsRef.current.add(m.id));
     const ids = new Set(incoming.map((m) => m.id));
-    setNewMessageIds((prev) => new Set([...prev, ...ids]));
+    setAnimatingIds((prev) => new Set([...prev, ...ids]));
 
-    // Remove flag de animação após ela completar
     setTimeout(() => {
-      setNewMessageIds((prev) => {
+      setAnimatingIds((prev) => {
         const next = new Set(prev);
         ids.forEach((id) => next.delete(id));
         return next;
       });
     }, 400);
 
-    // Scroll suave só se estiver perto do fim
     const container = containerRef.current;
     if (container) {
       const { scrollTop, scrollHeight, clientHeight } = container;
       if (scrollHeight - scrollTop - clientHeight < 200) {
-        bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+        requestAnimationFrame(() =>
+          bottomRef.current?.scrollIntoView({ behavior: "smooth" }),
+        );
       }
     }
   }, [messages]);
 
-  // Reset ao trocar de conversa
-  useEffect(() => {
-    isFirstLoad.current = true;
-    knownIdsRef.current = new Set();
-    setNewMessageIds(new Set());
-  }, [conversationId]);
-
-  const grouped = messages ? groupMessagesByDate(messages) : [];
+  const visibleMessages = removeDuplicateMessages(
+    messages?.filter((m) => !isTestMessage(m.body)) ?? [],
+  );
+  const grouped = groupMessagesByDate(visibleMessages);
 
   return (
     <div
@@ -77,7 +87,10 @@ export function ChatWindow({ conversationId }: { conversationId: string }) {
       style={{ background: "var(--bg-base)" }}
     >
       {conversation ? (
-        <ChatHeader conversation={conversation} />
+        <ChatHeader
+          conversation={conversation}
+          isSyncing={isFetching && !isLoading}
+        />
       ) : (
         <div
           className="h-[57px] shrink-0 animate-pulse"
@@ -103,7 +116,7 @@ export function ChatWindow({ conversationId }: { conversationId: string }) {
             message="Não foi possível carregar as mensagens."
             onRetry={() => refetch()}
           />
-        ) : !messages?.length ? (
+        ) : !visibleMessages.length ? (
           <EmptyChat />
         ) : (
           grouped.map((group) => (
@@ -128,7 +141,7 @@ export function ChatWindow({ conversationId }: { conversationId: string }) {
                 <MessageBubble
                   key={message.id}
                   message={message}
-                  isNew={newMessageIds.has(message.id)}
+                  isNew={animatingIds.has(message.id)}
                 />
               ))}
             </div>

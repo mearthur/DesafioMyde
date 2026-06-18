@@ -1,11 +1,14 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Send, Sparkles, Loader2 } from "lucide-react";
+import { Send, Sparkles, Loader2, Bot } from "lucide-react";
 import { useSendMessage, useAiSuggest } from "@/lib/queries";
 
 export function MessageInput({ conversationId }: { conversationId: string }) {
   const [text, setText] = useState("");
+  const [suggestionSource, setSuggestionSource] = useState<
+    "openai" | "mock" | "mock-fallback" | null
+  >(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const sendMutation = useSendMessage(conversationId);
   const aiSuggest = useAiSuggest();
@@ -22,6 +25,7 @@ export function MessageInput({ conversationId }: { conversationId: string }) {
     if (!trimmed || sendMutation.isPending) return;
     sendMutation.mutate(trimmed);
     setText("");
+    setSuggestionSource(null);
     requestAnimationFrame(() => textareaRef.current?.focus());
   }, [text, sendMutation]);
 
@@ -35,10 +39,19 @@ export function MessageInput({ conversationId }: { conversationId: string }) {
     [handleSend],
   );
 
+  const handleChange = useCallback(
+    (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+      setText(e.target.value);
+      if (suggestionSource) setSuggestionSource(null); // edição manual descarta o "selo" de IA
+    },
+    [suggestionSource],
+  );
+
   const handleAiSuggest = useCallback(async () => {
     try {
       const result = await aiSuggest.mutateAsync(conversationId);
       setText(result.suggestion);
+      setSuggestionSource(result.source);
       requestAnimationFrame(() => {
         const el = textareaRef.current;
         if (el) {
@@ -82,7 +95,24 @@ export function MessageInput({ conversationId }: { conversationId: string }) {
           }}
           role="alert"
         >
-          Não foi possível gerar sugestão.
+          Não foi possível gerar sugestão. Tente novamente.
+        </div>
+      )}
+
+      {/* Selo indicando que o texto atual é uma sugestão de IA ainda não editada */}
+      {suggestionSource && (
+        <div
+          className="mb-2 flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] fade-up w-fit"
+          style={{
+            background: "var(--accent-dim)",
+            color: "var(--accent-light)",
+            border: "1px solid var(--accent)22",
+          }}
+        >
+          <Bot className="h-3 w-3" />
+          {suggestionSource === "openai"
+            ? "Sugestão gerada por IA"
+            : "Sugestão (modo simulado)"}
         </div>
       )}
 
@@ -96,7 +126,10 @@ export function MessageInput({ conversationId }: { conversationId: string }) {
             color: "var(--accent-light)",
             border: "1px solid var(--accent)22",
           }}
-          aria-label="Sugerir com IA"
+          aria-label={
+            aiSuggest.isPending ? "Gerando sugestão" : "Sugerir resposta com IA"
+          }
+          title="Sugerir resposta com IA"
         >
           {aiSuggest.isPending ? (
             <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -111,7 +144,7 @@ export function MessageInput({ conversationId }: { conversationId: string }) {
         <textarea
           ref={textareaRef}
           value={text}
-          onChange={(e) => setText(e.target.value)}
+          onChange={handleChange}
           onKeyDown={handleKeyDown}
           placeholder="Digite uma mensagem"
           rows={1}

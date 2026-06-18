@@ -32,6 +32,7 @@ export function ConversationItem({
           (e.currentTarget as HTMLElement).style.background = "transparent";
       }}
       aria-current={isActive ? "page" : undefined}
+      aria-label={`Conversa com ${conversation.contactName}${conversation.unread > 0 ? `, ${conversation.unread} não lidas` : ""}. Última mensagem: ${conversation.lastMessage}`}
     >
       <Avatar
         name={conversation.contactName}

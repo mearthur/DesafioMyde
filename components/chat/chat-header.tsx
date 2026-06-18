@@ -1,11 +1,20 @@
 "use client";
 
 import { type Conversation } from "@/lib/api";
+import { formatPhoneNumber } from "@/lib/utils";
 import { Avatar } from "@/components/ui/avatar";
 import { Phone, ArrowLeft } from "lucide-react";
 import Link from "next/link";
 
-export function ChatHeader({ conversation }: { conversation: Conversation }) {
+interface ChatHeaderProps {
+  conversation: Conversation;
+  isSyncing?: boolean;
+}
+
+export function ChatHeader({
+  conversation,
+  isSyncing = false,
+}: ChatHeaderProps) {
   return (
     <header
       className="flex items-center gap-3 px-4 py-3 shrink-0"
@@ -35,9 +44,22 @@ export function ChatHeader({ conversation }: { conversation: Conversation }) {
         >
           {conversation.contactName}
         </p>
-        <p className="text-xs truncate" style={{ color: "var(--text-muted)" }}>
-          {conversation.contactPhone}
-        </p>
+        <div className="flex items-center gap-1.5">
+          <p
+            className="text-xs truncate"
+            style={{ color: "var(--text-muted)" }}
+          >
+            {formatPhoneNumber(conversation.contactPhone)}
+          </p>
+          {/* Indicador real de sincronização — reflete isFetching do React Query, não é decorativo */}
+          <span
+            className={`text-[10px] transition-opacity duration-300 ${isSyncing ? "opacity-100" : "opacity-0"}`}
+            style={{ color: "var(--accent-light)" }}
+            aria-live="polite"
+          >
+            · sincronizando
+          </span>
+        </div>
       </div>
 
       <a

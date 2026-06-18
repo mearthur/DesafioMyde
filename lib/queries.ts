@@ -5,6 +5,7 @@ import {
   getMessages,
   sendMessage,
   suggestReply,
+  type Conversation,
   type Message,
 } from "./api";
 
@@ -62,7 +63,7 @@ export function useSendMessage(conversationId: string) {
       );
 
       const optimisticMessage: Message = {
-        id: `optimistic-${Date.now()}`,
+        id: `optimistic-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
         direction: "out",
         body: text,
         status: "sent",
@@ -75,19 +76,22 @@ export function useSendMessage(conversationId: string) {
       );
 
       // Atualiza lastMessage na lista de conversas
-      queryClient.setQueryData(queryKeys.conversations, (old: unknown) => {
-        if (!Array.isArray(old)) return old;
-        return old.map((conv) =>
-          conv.id === conversationId
-            ? {
-                ...conv,
-                lastMessage: text,
-                lastMessageAt: new Date().toISOString(),
-                unread: 0,
-              }
-            : conv,
-        );
-      });
+      queryClient.setQueryData<Conversation[]>(
+        queryKeys.conversations,
+        (old) => {
+          if (!old) return old;
+          return old.map((conv) =>
+            conv.id === conversationId
+              ? {
+                  ...conv,
+                  lastMessage: text,
+                  lastMessageAt: new Date().toISOString(),
+                  unread: 0,
+                }
+              : conv,
+          );
+        },
+      );
 
       return { previousMessages };
     },

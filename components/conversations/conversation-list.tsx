@@ -94,6 +94,23 @@ export function ConversationList() {
               {totalUnread} não lidas
             </span>
           )}
+          <span
+            className="flex items-center gap-1.5 text-[10px] px-2 py-0.5 rounded-full"
+            style={{ color: "var(--green)" }}
+            title="Atualização automática ativa"
+          >
+            <span className="relative flex h-1.5 w-1.5">
+              <span
+                className="absolute inline-flex h-full w-full rounded-full opacity-60 animate-ping"
+                style={{ background: "var(--green)" }}
+              />
+              <span
+                className="relative inline-flex rounded-full h-1.5 w-1.5"
+                style={{ background: "var(--green)" }}
+              />
+            </span>
+            <span className="hidden lg:inline">ao vivo</span>
+          </span>
           <button
             onClick={() => refetch()}
             className="p-1.5 rounded-lg transition-colors"
@@ -104,7 +121,7 @@ export function ConversationList() {
             onMouseLeave={(e) =>
               (e.currentTarget.style.background = "transparent")
             }
-            aria-label="Atualizar"
+            aria-label="Atualizar lista de conversas agora"
           >
             <RefreshCw className="h-3.5 w-3.5" />
           </button>
